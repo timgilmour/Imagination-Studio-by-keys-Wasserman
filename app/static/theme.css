@@ -1,0 +1,110 @@
+/* Minimal dark: a local theme over studio.css and nodes.css (loaded after both from index.html).
+   Neutral greys, one light primary action, blue only for what is selected, status colours only for status.
+   No brand art, no glow, no breathing lights, no pill buttons, no grid texture, no serif, no hover lift.
+   Kept on purpose: the red blink while something renders and the Nodes running pulse (they say something is live). */
+
+/* ---------- tokens: :root:root outranks Settings' html.accent-cobalt ---------- */
+:root:root {
+  --bg:#0d0d0f; --bg2:#111113; --panel:#141416; --raise:#18181b; --raise2:#202024; --ink:#0d0d0f;
+  --line:rgba(255,255,255,.07); --line2:rgba(255,255,255,.11); --line3:rgba(255,255,255,.18);
+  --text:#e6e6e9; --dim:#a1a1aa; --faint:#86868f;
+  --sh-card:none; --sh-lift:none; --sh-btn:none; --creator-glow:none;
+  /* the studio's --amber means both "the one action" and "warning / in progress" (gauges, Nodes, scans set it from
+     JS). It stays amber, muted, for the status meaning; the action gets its own light neutral, --act */
+  --act:#e6e6e9; --act-ink:#0d0d0f;
+  --amber:#d4a24c; --amber-ink:#0d0d0f; --amber-muted:var(--faint); --amber-wash:rgba(212,162,76,.1);
+  --blue:#3b82f6; --blue-text:#7aa7ff; --blue-wash:rgba(59,130,246,.13);
+  --green:#4ade80; --green-wash:rgba(74,222,128,.1);
+  --red:#f2626f; --red-wash:rgba(242,98,111,.1); --warn:#e2b74f;
+  --teal:#1c1c20; --teal-wash:rgba(255,255,255,.02);
+  --display:var(--sans);
+  --r1:6px; --r2:8px; --r3:10px;
+}
+
+/* ---------- brand art out: a plain name in the sidebar, nothing in the footer ---------- */
+.brand .ribbon, .brand .title, .brand .byline, .credit, .st-about img, img[src*="tensorfold"] { display:none !important; }
+.brand { padding:20px 20px 16px; }
+.brand::before { content:"Imagination Studio"; font:600 15px/1.2 var(--sans); color:var(--text); }
+header#top .mhome img { display:none !important; }
+@media (max-width:1099px) { .brand::before { content:none; } .brand { padding:8px 0; } }
+@media (max-width:720px) { header#top .mhome::before { content:"Studio"; font:600 15px var(--sans); color:var(--text); } }
+
+/* ---------- Home: no hero, no poster, no promo row; the composer leads ---------- */
+.homehero, .home .sectionhead:has(+ .suiteRow), .home .suiteRow { display:none; }
+.composer { margin-top:0; }
+.cmp-text::placeholder { font:400 19px/1.45 var(--sans); }
+.cmp-go { height:44px; padding:0 22px; font-size:16px; }
+
+/* ---------- engine and vault pages: no cover art, no module glyph, no model logos ---------- */
+.enghead .art, .eyebrow.engmark img, .marks .mk img, .cmp-mode .mk img { display:none; }
+.enghead, .enghead.vault { grid-template-columns:minmax(0,1fr); margin-bottom:28px; }
+
+/* picture cards become text cards: the art goes, the kind label sits above the title */
+.pcard .art { display:none; }
+.pcard .k { position:static; align-self:flex-start; margin:14px 18px 0; padding:0; background:none; color:var(--faint); font:500 12px var(--sans); }
+.pcard .k + .txt { padding-top:4px; }
+
+/* ---------- no texture, no lift, no vignette, no sheen ---------- */
+main::before { display:none; }
+html .tile:hover, html .hubcard:hover, html .pcard:hover:not(:disabled), html .app:hover:not(:disabled),
+html button.su-app:hover:not(:disabled), html .lookcard:hover { transform:none; }
+.pcard .art::after, .lookcard .art::after { display:none; }
+.lane.r .mini i::after, aside#bay .bar i::after { display:none; }
+
+/* ---------- type: one sans, normal case, no tracking ---------- */
+html *, html *::before, html *::after { text-transform:none !important; letter-spacing:normal !important; }
+.signin-code span, .cn-code span { letter-spacing:.06em !important; }
+h2 { font:600 22px/1.25 var(--sans); }
+.display, .homehero .display, .homehero.slim .display { font:600 28px/1.2 var(--sans); }
+.big { font:600 30px/1 var(--sans); }
+.ring .lab b { font:600 28px/1 var(--sans); }
+.st-line { font:500 16px/1.4 var(--sans); }
+label, h3, .eyebrow, #roomname, .bayhead h2, .chat b, .eg b, .tip b, #coach .say small { font-family:var(--sans); font-size:13px; }
+nav#rooms .grp { font-family:var(--sans); }  /* no size here: the icon rail hides it with font-size:0 */
+nav#rooms .grp.g-engines, nav#rooms .grp.g-vaults { color:var(--faint); font-weight:500; }
+nav#rooms .grp.g-engines::after, nav#rooms .grp.g-vaults::after { display:none; }
+
+/* ---------- buttons: small radius, grey hairlines, a flat light primary ---------- */
+html button { border-radius:var(--r1); border-color:var(--line2); }
+html button:hover:not(:disabled) { border-color:var(--line3); }
+html button.ghost { border-color:var(--line); }
+html .navpill, html .toggle, html .suggest button, html .cmp-mode { border-radius:var(--r1); }
+html button.primary, html button.hot { border-radius:var(--r1); background:var(--act); border-color:var(--act); color:var(--act-ink); box-shadow:none; }
+html button.primary:hover:not(:disabled), html button.hot:hover:not(:disabled),
+html button.primary:focus-visible, html button.hot:focus-visible { background:#fff; border-color:#fff; box-shadow:none !important; }
+html .signin-open { background:var(--act); color:var(--act-ink); box-shadow:none; } html .signin-open:hover { background:#fff; }
+/* the other places studio.css paints the action in --amber: progress, the current step, sliders, the phone menu */
+html .bar i, html .lane .mini i { background:var(--act); }
+html .steps button.on { box-shadow:inset 0 -2px 0 var(--act); }
+html input[type=range] { accent-color:var(--act); }
+html #moresheet .it.on { box-shadow:inset 2px 0 0 var(--act); } html #moresheet .it.on .ico { color:var(--act); }
+html button.sharp, html .summary .eta, html .summary .chip.k { color:var(--text); }
+html .dots button.on { border-color:var(--line3); } html .dots button.past { color:var(--dim); }
+/* the amber hairlines written as raw colours in studio.css and agent.js */
+html button.sharp, html .dots button.past, html .tag2.t, html .agr-need, html .st-rail button.on, html .st-local { border-color:var(--line2); }
+html .switch input:not(:checked) { background:#2a2a30; }
+
+/* ---------- where you are: a grey fill in the sidebar, an underline in the top bar ---------- */
+html nav#rooms { padding-left:10px; padding-right:10px; }
+html nav#rooms button.on { border-radius:var(--r1); background:var(--raise2); box-shadow:none !important; animation:none !important; }
+html nav#rooms button.on svg { stroke:currentColor; }
+html #subtabs { padding:0; margin:0; }
+html #subtabs button { align-self:stretch; height:auto; border-radius:0; padding:0 14px; }
+html #subtabs button.on { box-shadow:none !important; animation:none !important; }
+html #subtabs button.on::after { display:block; background:var(--text); }
+
+/* ---------- status: still dots, no glow; only what is rolling blinks ---------- */
+html .machinepill, html .m-plat { border-radius:var(--r1); border:1px solid var(--line); background:var(--panel); box-shadow:none !important; animation:none !important;
+  font:500 13px var(--sans); color:var(--text); }
+html .machinepill:hover:not(:disabled) { border-color:var(--line2); background:var(--raise); }
+html .machinepill .txt { color:var(--dim); }
+html .machinepill.warn::after { background:var(--warn); box-shadow:none; }
+html .machinepill .dotl, html .m-plat::before, html #updpanel .dotl.t { box-shadow:none; }
+html .dotl:not(.o) { animation:none; }
+html .dotl.r { animation:tally 1.6s ease-in-out infinite; }
+html .dotl.o { color:#3a3a40; }
+html aside#bay .pill.queued::before { animation:none; }
+html aside#bay .pill.running::before { animation:tally 1.2s ease-in-out infinite; }
+
+/* ---------- the render bay: a plain panel ---------- */
+html aside#bay { background:var(--bg2); border-top:1px solid var(--line2); }

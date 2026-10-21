@@ -1,6 +1,7 @@
 /* Minimal dark: a local theme over studio.css and nodes.css (loaded after both from index.html).
    Neutral greys, one light primary action, blue only for what is selected, status colours only for status.
-   No brand art, no glow, no breathing lights, no pill buttons, no grid texture, no serif, no hover lift.
+   No sidebar logo masthead or TensorFold footer (every other picture stays), no glow, no breathing lights,
+   no pill buttons, no grid texture, no serif, no hover lift.
    Kept on purpose: the red blink while something renders and the Nodes running pulse (they say something is live). */
 
 /* ---------- tokens: :root:root outranks Settings' html.accent-cobalt ---------- */
@@ -21,34 +22,23 @@
   --r1:6px; --r2:8px; --r3:10px;
 }
 
-/* ---------- brand art out: a plain name in the sidebar, nothing in the footer ---------- */
-.brand .ribbon, .brand .title, .brand .byline, .credit, .st-about img, img[src*="tensorfold"] { display:none !important; }
+/* ---------- the only hidden art: the sidebar's logo masthead and its TensorFold footer ----------
+   Every other picture stays: cover art, card art, model and app marks, the Home poster. */
+.brand .ribbon, .brand .title, .brand .byline, .credit { display:none !important; }
 .brand { padding:20px 20px 16px; }
 .brand::before { content:"Imagination Studio"; font:600 15px/1.2 var(--sans); color:var(--text); }
 header#top .mhome img { display:none !important; }
 @media (max-width:1099px) { .brand::before { content:none; } .brand { padding:8px 0; } }
 @media (max-width:720px) { header#top .mhome::before { content:"Studio"; font:600 15px var(--sans); color:var(--text); } }
 
-/* ---------- Home: no hero, no poster, no promo row; the composer leads ---------- */
-.homehero, .home .sectionhead:has(+ .suiteRow), .home .suiteRow { display:none; }
-.composer { margin-top:0; }
+/* ---------- Home composer: sans placeholder, a plain-sized Generate ---------- */
 .cmp-text::placeholder { font:400 19px/1.45 var(--sans); }
 .cmp-go { height:44px; padding:0 22px; font-size:16px; }
 
-/* ---------- engine and vault pages: no cover art, no module glyph, no model logos ---------- */
-.enghead .art, .eyebrow.engmark img, .marks .mk img, .cmp-mode .mk img { display:none; }
-.enghead, .enghead.vault { grid-template-columns:minmax(0,1fr); margin-bottom:28px; }
-
-/* picture cards become text cards: the art goes, the kind label sits above the title */
-.pcard .art { display:none; }
-.pcard .k { position:static; align-self:flex-start; margin:14px 18px 0; padding:0; background:none; color:var(--faint); font:500 12px var(--sans); }
-.pcard .k + .txt { padding-top:4px; }
-
-/* ---------- no texture, no lift, no vignette, no sheen ---------- */
+/* ---------- no texture, no lift, no sheen ---------- */
 main::before { display:none; }
 html .tile:hover, html .hubcard:hover, html .pcard:hover:not(:disabled), html .app:hover:not(:disabled),
 html button.su-app:hover:not(:disabled), html .lookcard:hover { transform:none; }
-.pcard .art::after, .lookcard .art::after { display:none; }
 .lane.r .mini i::after, aside#bay .bar i::after { display:none; }
 
 /* ---------- type: one sans, normal case, no tracking ---------- */
@@ -78,7 +68,8 @@ html .bar i, html .lane .mini i { background:var(--act); }
 html .steps button.on { box-shadow:inset 0 -2px 0 var(--act); }
 html input[type=range] { accent-color:var(--act); }
 html #moresheet .it.on { box-shadow:inset 2px 0 0 var(--act); } html #moresheet .it.on .ico { color:var(--act); }
-html button.sharp, html .summary .eta, html .summary .chip.k { color:var(--text); }
+html button.sharp, html .summary .eta, html .summary .chip.k, html .tag2.t { color:var(--text); }
+html button.sharp.on { border-color:var(--blue); background:var(--blue-wash); }  /* selected is blue everywhere */
 html .dots button.on { border-color:var(--line3); } html .dots button.past { color:var(--dim); }
 /* the amber hairlines written as raw colours in studio.css and agent.js */
 html button.sharp, html .dots button.past, html .tag2.t, html .agr-need, html .st-rail button.on, html .st-local { border-color:var(--line2); }

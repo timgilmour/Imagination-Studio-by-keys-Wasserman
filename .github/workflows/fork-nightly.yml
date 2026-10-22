@@ -1,0 +1,168 @@
+# Fork only (never in a PR to upstream). Keeps the fork's own branches current with upstream and builds `live`
+#   live = upstream/main + theme/minimal-dark commits + feat/comfy-workers commits
+# (`main` of the fork only carries this file and is left alone.)
+# which the Spark's install is moved to by hand. Nothing is pushed unless the rebases, the build of `live` and
+# upstream's own tests are all green; otherwise one open issue "Nightly rebase failed" says where it stopped.
+name: fork-nightly
+
+on:
+  schedule:
+    - cron: "0 4 * * *"
+  workflow_dispatch:
+    inputs:
+      extra_branch:
+        description: "One more fork branch to rebase (rehearses the failure path with a throwaway branch)"
+        required: false
+
+permissions:
+  contents: write
+  issues: write
+
+defaults:
+  run:
+    shell: bash   # -e and pipefail, so a failing command before `| tee` still fails the step
+
+env:
+  UPSTREAM: https://github.com/drowzeys/Imagination-Studio-by-keys-Wasserman.git
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Fetch upstream
+        id: setup
+        run: |
+          # Where the steps leave their output and the branch they were on, for the failure issue.
+          echo "LOG=$RUNNER_TEMP/nightly.log" >> "$GITHUB_ENV"
+          echo "WHERE=$RUNNER_TEMP/nightly.where" >> "$GITHUB_ENV"
+          # Upstream's CI refuses any commit whose committer is not a noreply address, and a rebase makes us the committer.
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream "$UPSTREAM"
+          git fetch -q upstream main
+          git fetch -q origin
+      - name: Rebase our branches on upstream
+        id: rebase
+        env:
+          EXTRA: ${{ inputs.extra_branch }}
+        run: |
+          : > "$LOG"
+          rebased=""
+          # `main` is not rebased: it only holds this workflow, and GitHub refuses a GITHUB_TOKEN push that creates or
+          # updates .github/workflows/*, which a rebased main would be on every night upstream moves. A stale main is
+          # harmless (scheduled runs read its copy of this file; the job fetches upstream itself). The branches below
+          # are based on upstream/main itself, so the workflow never leaks into them or into `live`.
+          for b in theme/minimal-dark feat/comfy-workers $EXTRA; do
+            if ! git rev-parse -q --verify "refs/remotes/origin/$b" >/dev/null; then
+              echo "origin/$b does not exist yet, skipped" | tee -a "$LOG"; continue
+            fi
+            echo "$b" > "$WHERE"
+            git checkout -q -B "$b" "origin/$b"
+            git rebase upstream/main 2>&1 | tee -a "$LOG" || { git rebase --abort || true; exit 1; }
+            rebased="$rebased $b"
+          done
+          echo "rebased=$rebased" >> "$GITHUB_OUTPUT"
+      - name: Build live
+        id: live
+        run: |
+          # Ranges are taken after the rebases, so they are exactly each branch's own commits.
+          git checkout -q -B live upstream/main
+          for b in theme/minimal-dark feat/comfy-workers; do
+            git rev-parse -q --verify "refs/heads/$b" >/dev/null || continue
+            echo "live: $b" > "$WHERE"
+            if [ -n "$(git rev-list upstream/main.."$b")" ]; then
+              git cherry-pick upstream/main.."$b" 2>&1 | tee -a "$LOG" || { git cherry-pick --abort || true; exit 1; }
+            fi
+          done
+          git log --oneline upstream/main..live
+      # The steps below are upstream's tests.yml, unchanged, so `live` is held to the same bar as a PR.
+      - id: python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - id: node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - name: ffmpeg
+        id: ffmpeg
+        run: sudo apt-get update -q && sudo apt-get install -y -q ffmpeg
+      - name: Test dependencies
+        id: deps
+        run: python -m pip install fastapi==0.142.2 starlette==1.7.0 httpx==0.28.1 uvicorn==0.54.0 python-multipart==0.0.32 numpy==2.4.6 pillow==12.3.0 av pytest
+      - name: Tests
+        id: tests
+        env:
+          STUDIO_TESTS_NEED_NODE: "1"
+        run: |
+          echo "live: tests" > "$WHERE"
+          export STUDIO_HOME="$RUNNER_TEMP/ImaginationStudio"
+          python -m pytest -q tests 2>&1 | tee -a "$LOG"
+      - name: Push
+        id: push
+        env:
+          REBASED: ${{ steps.rebase.outputs.rebased }}
+          # Optional token with `workflow` scope, for when upstream changes its own workflow files (GITHUB_TOKEN cannot push those).
+          FORK_PUSH_TOKEN: ${{ secrets.FORK_PUSH_TOKEN }}
+        run: |
+          echo "push: $REBASED live" > "$WHERE"
+          # One atomic push, each ref leased against what this run fetched: if anyone pushed meanwhile, or any ref is
+          # refused, nothing is published and `live` never disagrees with the branches.
+          refs=""; leases=""
+          for b in $REBASED live; do
+            leases="$leases --force-with-lease=refs/heads/$b:$(git rev-parse -q --verify "refs/remotes/origin/$b" || true)"
+            refs="$refs $b:$b"
+          done
+          auth=""
+          if [ -n "$FORK_PUSH_TOKEN" ]; then   # an empty value clears the checkout's GITHUB_TOKEN header
+            git remote set-url --push origin "https://x-access-token:$FORK_PUSH_TOKEN@github.com/$GITHUB_REPOSITORY.git"
+            auth="-c http.https://github.com/.extraheader="
+          fi
+          git $auth push --atomic $leases origin $refs 2>&1 | tee "$RUNNER_TEMP/push.out" | tee -a "$LOG" || {
+            if grep -qi 'workflow' "$RUNNER_TEMP/push.out"; then
+              echo "upstream changed its workflow files; GitHub does not let this job's token push them; add a token with workflow scope as a repository secret named FORK_PUSH_TOKEN, or update these branches by hand" > "$RUNNER_TEMP/nightly.reason"
+            fi
+            exit 1
+          }
+      - name: Close the failure issue
+        id: close
+        if: success()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # REST rather than `gh issue`: the Actions token is refused on gh's GraphQL calls.
+          for n in $(gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" --jq '.[]|select(.title=="Nightly rebase failed" and (.pull_request|not))|.number'); do
+            gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$n/comments" -f body="Green again: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID" >/dev/null
+            gh api -X PATCH "repos/$GITHUB_REPOSITORY/issues/$n" -f state=closed >/dev/null
+          done
+      - name: Open or update the failure issue
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OUTCOMES: ${{ toJSON(steps) }}
+        run: |
+          # The first step whose outcome is failure is the one that stopped the run (later ones are skipped).
+          step="unknown - see the run"
+          for pair in "setup:fetching upstream" "rebase:rebase" "live:building live" "python:setting up Python" "node:setting up node" \
+                      "ffmpeg:installing ffmpeg" "deps:installing the test dependencies" "tests:tests on live" "push:push" "close:closing the issue"; do
+            id=${pair%%:*}
+            [ "$(echo "$OUTCOMES" | jq -r --arg id "$id" '.[$id].outcome // empty')" = failure ] && { step=${pair#*:}; id_failed=$id; break; }
+          done
+          # The branch marker is only meaningful for the steps that write it.
+          case "${id_failed:-}" in rebase|live|tests|push) where=$(cat "$WHERE" 2>/dev/null || echo "-");; *) where="-";; esac
+          reason=$(cat "$RUNNER_TEMP/nightly.reason" 2>/dev/null || true)
+          {
+            echo "Date: $(date -u +%F)"
+            echo "Branch: $where"
+            echo "Failing step: $step"
+            [ -n "$reason" ] && echo "Reason: $reason"
+            echo "Run: $GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID"
+            echo; echo "Last lines of the output:"; echo '```'; tail -n 30 "$LOG" 2>/dev/null || true; echo '```'
+          } > "$RUNNER_TEMP/issue.md"
+          n=$(gh api "repos/$GITHUB_REPOSITORY/issues?state=open&per_page=100" --jq '[.[]|select(.title=="Nightly rebase failed" and (.pull_request|not))][0].number // empty')
+          if [ -n "$n" ]; then gh api -X POST "repos/$GITHUB_REPOSITORY/issues/$n/comments" -F body=@"$RUNNER_TEMP/issue.md" >/dev/null
+          else gh api -X POST "repos/$GITHUB_REPOSITORY/issues" -f title="Nightly rebase failed" -F body=@"$RUNNER_TEMP/issue.md" >/dev/null; fi
